@@ -10,7 +10,7 @@ CATEGORY_RULES: list[tuple[str, str]] = [
     (r"\b(delhi metro|metro|rail|irctc)\b", "Transit"),
     (r"\b(spotify|netflix|prime|hotstar|youtube premium)\b", "Subscriptions"),
     (r"\b(amazon|flipkart|myntra|ajio|nykaa)\b", "Shopping"),
-    (r"\b(zomato|swiggy|burger king|mcdonald|restaurant|cafe|pizza)\b", "Food"),
+    (r"\b(zomato|swiggy|burger king|mcdonald|belgian waffle|restaurant|cafe|pizza)\b", "Food"),
     (r"\b(airtel|jio|vi|bsnl|recharge|electricity|water|gas)\b", "Utilities"),
     (r"\b(pharmacy|apollo|medplus|hospital|clinic|doctor)\b", "Health"),
     (r"\b(rent|maintenance|society)\b", "Housing"),

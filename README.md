@@ -21,6 +21,8 @@ python3 -m expense_tracker.main export-csv expense_tracker_export.csv
 Dates are stored and displayed as `dd/mm/yyyy`. Query order is newest date first,
 then newest inserted row first for entries on the same date.
 
+The TUI supports manual categories, filtered transaction views, hard database
+clear, and direct SQL execution against the SQLite database.
+
 PDF pruning writes derived files under `.pruned/` and reuses an existing pruned
 copy. Files already named as pruned PDFs are not pruned again.
-

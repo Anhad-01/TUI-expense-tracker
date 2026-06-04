@@ -137,6 +137,11 @@ class ExpenseDB:
                 skipped += 1
         return inserted, skipped
 
+    def clear_transactions(self) -> int:
+        cursor = self.conn.execute("DELETE FROM transactions")
+        self.conn.commit()
+        return cursor.rowcount
+
     def fetch_transactions(
         self,
         category: str | None = None,
@@ -178,6 +183,14 @@ class ExpenseDB:
                 "SELECT DISTINCT category FROM transactions ORDER BY category"
             )
         ]
+
+    def run_sql(self, query: str) -> tuple[list[str], list[sqlite3.Row], int]:
+        cursor = self.conn.execute(query)
+        if cursor.description:
+            columns = [column[0] for column in cursor.description]
+            return columns, list(cursor.fetchall()), cursor.rowcount
+        self.conn.commit()
+        return [], [], cursor.rowcount
 
     def export_csv(self, output_path: Path | str) -> Path:
         path = Path(output_path)
