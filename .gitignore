@@ -1,0 +1,8 @@
+*.sqlite3
+*.sqlite3-*
+expense_tracker_export.csv
+.pruned/
+statements/
+statements/.pruned/
+__pycache__/
+*.pyc
