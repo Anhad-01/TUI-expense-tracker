@@ -96,7 +96,7 @@ def extract_transactions_from_pdf(
 def _transactions_from_table(table: list[list[object]], statement_file: str) -> list[Transaction]:
     rows: list[Transaction] = []
     for raw_row in table:
-        cells = [normalize_text(cell) for cell in raw_row]
+        cells = [normalize_text(cell) for cell in raw_row if cell is not None][:6]
         if len(cells) < 6:
             continue
         txn_date = cells[0]
