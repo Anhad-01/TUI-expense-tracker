@@ -6,15 +6,17 @@ import re
 DEFAULT_CATEGORY = "Uncategorized"
 
 CATEGORY_RULES: list[tuple[str, str]] = [
-    (r"\b(rapido|uber|ola|namma yatri)\b", "Transport"),
-    (r"\b(delhi metro|metro|rail|irctc)\b", "Transit"),
+    (r"\b(rapido|uber|ola|namma yatri\delhi metro|metro)\b", "Transport"),
+    (r"\b(blinkit|rail|irctc)\b", "Transit"),
     (r"\b(spotify|netflix|prime|hotstar|youtube premium)\b", "Subscriptions"),
-    (r"\b(amazon|flipkart|myntra|ajio|nykaa)\b", "Shopping"),
-    (r"\b(zomato|swiggy|burger king|mcdonald|belgian waffle|restaurant|cafe|pizza)\b", "Food"),
+    (r"\b(amazon|zudio|max|trends|unity one|flipkart|myntra|smart bazaar|ajio|nykaa)\b", "Shopping"),
+    (r"\b(zomato|swiggy|burger king|bakington|bikanervala|mcdonald|belgian waffle|restaurant|cafe|pizza)\b", "Food"),
     (r"\b(airtel|jio|vi|bsnl|recharge|electricity|water|gas)\b", "Utilities"),
-    (r"\b(pharmacy|apollo|medplus|hospital|clinic|doctor)\b", "Health"),
+    (r"\b(pharmacy|apollo|medplus|hospital|clinic|bansal|doctor)\b", "Health"),
     (r"\b(rent|maintenance|society)\b", "Housing"),
-    (r"\b(salary|refund|cashback|interest)\b", "Income"),
+    (r"\b(salary|refund|cashback|interest|edxsollp)\b", "Income"),
+    (r"\b(vrinda|yavnika|mahima|esha|saket|shweta|dev|arjun gupta)\b", "Friends"),
+    (r"\b(rani|parul)\b", "Family"),
 ]
 
 
