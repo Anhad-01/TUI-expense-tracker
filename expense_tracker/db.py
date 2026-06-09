@@ -45,6 +45,7 @@ def make_row_hash(tx: Transaction) -> str:
         tx.other_information.strip(),
         tx.source.strip(),
         tx.statement_file.strip(),
+        str(tx.pdf_row_number),
     ]
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
@@ -75,6 +76,7 @@ class ExpenseDB:
                 category TEXT NOT NULL,
                 source TEXT NOT NULL,
                 statement_file TEXT NOT NULL DEFAULT '',
+                pdf_row_number INTEGER NOT NULL DEFAULT 0,
                 row_hash TEXT NOT NULL UNIQUE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -97,6 +99,7 @@ class ExpenseDB:
             category=(tx.category or categorize(tx.transaction)).strip(),
             source=(tx.source or "manual").strip(),
             statement_file=(tx.statement_file or "").strip(),
+            pdf_row_number=tx.pdf_row_number,
         )
         row_hash = make_row_hash(normalized)
         try:
@@ -104,9 +107,9 @@ class ExpenseDB:
                 """
                 INSERT INTO transactions (
                     txn_date, txn_date_sort, "transaction", withdrawals, deposits, balance,
-                    other_information, category, source, statement_file, row_hash
+                    other_information, category, source, statement_file, pdf_row_number, row_hash
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     normalized.txn_date,
@@ -119,6 +122,7 @@ class ExpenseDB:
                     normalized.category,
                     normalized.source,
                     normalized.statement_file,
+                    normalized.pdf_row_number,
                     row_hash,
                 ),
             )

@@ -14,4 +14,5 @@ class Transaction:
     category: str = "Uncategorized"
     source: str = "manual"
     statement_file: str = ""
+    pdf_row_number: int = 0
 

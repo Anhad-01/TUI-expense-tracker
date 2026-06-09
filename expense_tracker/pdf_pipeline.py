@@ -54,15 +54,20 @@ def extract_transactions_from_pdf(
     pdfplumber = _require_pdfplumber()
     source = Path(pdf_path)
     transactions: list[Transaction] = []
+    row_number = 0
     with pdfplumber.open(source, password=password or "") as pdf:
         for page in pdf.pages:
             for table in page.extract_tables() or []:
-                transactions.extend(_transactions_from_table(table, source.name))
+                batch, row_number = _transactions_from_table(table, source.name, row_number)
+                transactions.extend(batch)
     return transactions
 
 
-def _transactions_from_table(table: list[list[object]], statement_file: str) -> list[Transaction]:
+def _transactions_from_table(
+    table: list[list[object]], statement_file: str, start_row: int = 0
+) -> tuple[list[Transaction], int]:
     rows: list[Transaction] = []
+    row_number = start_row
     for raw_row in table:
         cells = [normalize_text(cell) for cell in raw_row if cell is not None][:6]
         if len(cells) < 6:
@@ -74,6 +79,7 @@ def _transactions_from_table(table: list[list[object]], statement_file: str) -> 
         transaction = simplify_transaction(transaction_raw)
         if not transaction or transaction.lower() in {"opening balance", "closing balance"}:
             continue
+        row_number += 1
         rows.append(
             Transaction(
                 txn_date=statement_date_to_display(txn_date),
@@ -85,9 +91,10 @@ def _transactions_from_table(table: list[list[object]], statement_file: str) -> 
                 category=categorize(transaction),
                 source="pdf",
                 statement_file=statement_file,
+                pdf_row_number=row_number,
             )
         )
-    return rows
+    return rows, row_number
 
 
 
