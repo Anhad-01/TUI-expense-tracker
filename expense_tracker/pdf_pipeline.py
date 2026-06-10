@@ -84,12 +84,10 @@ def _transactions_from_table(
             Transaction(
                 txn_date=statement_date_to_display(txn_date),
                 transaction=transaction,
-                withdrawals=parse_amount(cells[2]),
-                deposits=parse_amount(cells[3]),
-                balance=parse_amount(cells[4]),
-                other_information=cells[5],
+                debit=parse_amount(cells[2]),
+                credit=parse_amount(cells[3]),
                 category=categorize(transaction),
-                source="pdf",
+                mode="UPI",
                 statement_file=statement_file,
                 pdf_row_number=row_number,
             )

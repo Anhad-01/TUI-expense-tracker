@@ -21,10 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
     manual = sub.add_parser("add", help="Add one manual transaction")
     manual.add_argument("--date", required=True, help="dd/mm/yyyy")
     manual.add_argument("--transaction", required=True)
-    manual.add_argument("--withdrawals", type=float)
-    manual.add_argument("--deposits", type=float)
-    manual.add_argument("--balance", type=float)
-    manual.add_argument("--other", default="")
+    manual.add_argument("--debit", type=float)
+    manual.add_argument("--credit", type=float)
     manual.add_argument("--category", default=None)
 
     sub.add_parser("list", help="List transactions")
@@ -51,12 +49,10 @@ def run(argv: list[str] | None = None) -> int:
                     Transaction(
                         txn_date=args.date,
                         transaction=args.transaction,
-                        withdrawals=args.withdrawals,
-                        deposits=args.deposits,
-                        balance=args.balance,
-                        other_information=args.other,
+                        debit=args.debit,
+                        credit=args.credit,
                         category=category,
-                        source="manual",
+                        mode="manual",
                     )
                 )
                 print("Inserted manual transaction." if inserted else "Skipped duplicate transaction.")
@@ -64,8 +60,8 @@ def run(argv: list[str] | None = None) -> int:
                 for row in db.fetch_transactions():
                     print(
                         f"{row['txn_date']} | {row['transaction']} | "
-                        f"W:{row['withdrawals'] or ''} D:{row['deposits'] or ''} | "
-                        f"{row['category']} | {row['source']}"
+                        f"D:{row['debit'] or ''} C:{row['credit'] or ''} | "
+                        f"{row['category']} | {row['mode']}"
                     )
             elif args.command == "export-csv":
                 print(f"Exported {db.export_csv(args.output_path)}")

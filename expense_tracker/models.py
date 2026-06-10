@@ -7,12 +7,9 @@ from dataclasses import dataclass
 class Transaction:
     txn_date: str
     transaction: str
-    withdrawals: float | None = None
-    deposits: float | None = None
-    balance: float | None = None
-    other_information: str = ""
+    debit: float | None = None
+    credit: float | None = None
     category: str = "Uncategorized"
-    source: str = "manual"
+    mode: str = "manual"
     statement_file: str = ""
     pdf_row_number: int = 0
-

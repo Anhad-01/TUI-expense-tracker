@@ -59,8 +59,8 @@ class ExpenseTrackerApp(App):
                 yield Input(placeholder="Date dd/mm/yyyy", id="manual_date")
                 yield Input(placeholder="Transaction", id="manual_transaction")
                 yield Input(placeholder="Category", id="manual_category")
-                yield Input(placeholder="Withdrawal", id="manual_withdrawal")
-                yield Input(placeholder="Deposit", id="manual_deposit")
+                yield Input(placeholder="Debit", id="manual_debit")
+                yield Input(placeholder="Credit", id="manual_credit")
                 yield Button("Add", id="add_manual")
             with Horizontal(classes="toolbar"):
                 yield Input(placeholder="Filter category", id="filter_category")
@@ -84,12 +84,10 @@ class ExpenseTrackerApp(App):
         table.add_columns(
             "Date",
             "Transaction",
-            "Withdrawal",
-            "Deposit",
-            "Balance",
+            "Debit",
+            "Credit",
             "Category",
-            "Source",
-            "Other",
+            "Mode",
         )
 
     def show_transactions(
@@ -114,12 +112,10 @@ class ExpenseTrackerApp(App):
             table.add_row(
                 row["txn_date"],
                 row["transaction"],
-                "" if row["withdrawals"] is None else f"{row['withdrawals']:.2f}",
-                "" if row["deposits"] is None else f"{row['deposits']:.2f}",
-                "" if row["balance"] is None else f"{row['balance']:.2f}",
+                "" if row["debit"] is None else f"{row['debit']:.2f}",
+                "" if row["credit"] is None else f"{row['credit']:.2f}",
                 row["category"],
-                row["source"],
-                row["other_information"],
+                row["mode"],
             )
 
     def set_status(self, message: str) -> None:
@@ -174,8 +170,8 @@ class ExpenseTrackerApp(App):
         date = self.query_one("#manual_date", Input).value.strip()
         transaction = self.query_one("#manual_transaction", Input).value.strip()
         manual_category = self.query_one("#manual_category", Input).value.strip()
-        withdrawal = self.query_one("#manual_withdrawal", Input).value.strip()
-        deposit = self.query_one("#manual_deposit", Input).value.strip()
+        debit = self.query_one("#manual_debit", Input).value.strip()
+        credit = self.query_one("#manual_credit", Input).value.strip()
         if not date or not transaction:
             self.set_status("Manual entry needs date and transaction.")
             return
@@ -184,10 +180,10 @@ class ExpenseTrackerApp(App):
                 Transaction(
                     txn_date=date,
                     transaction=transaction,
-                    withdrawals=float(withdrawal) if withdrawal else None,
-                    deposits=float(deposit) if deposit else None,
+                    debit=float(debit) if debit else None,
+                    credit=float(credit) if credit else None,
                     category=manual_category or categorize(transaction),
-                    source="manual",
+                    mode="manual",
                 )
             )
         except Exception as exc:

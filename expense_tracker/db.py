@@ -39,11 +39,9 @@ def make_row_hash(tx: Transaction) -> str:
     parts = [
         parse_display_date(tx.txn_date),
         tx.transaction.strip(),
-        "" if tx.withdrawals is None else f"{tx.withdrawals:.2f}",
-        "" if tx.deposits is None else f"{tx.deposits:.2f}",
-        "" if tx.balance is None else f"{tx.balance:.2f}",
-        tx.other_information.strip(),
-        tx.source.strip(),
+        "" if tx.debit is None else f"{tx.debit:.2f}",
+        "" if tx.credit is None else f"{tx.credit:.2f}",
+        tx.mode.strip(),
         tx.statement_file.strip(),
         str(tx.pdf_row_number),
     ]
@@ -69,12 +67,10 @@ class ExpenseDB:
                 txn_date TEXT NOT NULL,
                 txn_date_sort TEXT NOT NULL,
                 "transaction" TEXT NOT NULL,
-                withdrawals REAL,
-                deposits REAL,
-                balance REAL,
-                other_information TEXT NOT NULL DEFAULT '',
+                debit REAL,
+                credit REAL,
                 category TEXT NOT NULL,
-                source TEXT NOT NULL,
+                mode TEXT NOT NULL,
                 statement_file TEXT NOT NULL DEFAULT '',
                 pdf_row_number INTEGER NOT NULL DEFAULT 0,
                 row_hash TEXT NOT NULL UNIQUE,
@@ -92,12 +88,10 @@ class ExpenseDB:
         normalized = Transaction(
             txn_date=txn_date,
             transaction=tx.transaction.strip(),
-            withdrawals=amount_to_db(tx.withdrawals),
-            deposits=amount_to_db(tx.deposits),
-            balance=amount_to_db(tx.balance),
-            other_information=(tx.other_information or "").strip(),
+            debit=amount_to_db(tx.debit),
+            credit=amount_to_db(tx.credit),
             category=(tx.category or categorize(tx.transaction)).strip(),
-            source=(tx.source or "manual").strip(),
+            mode=(tx.mode or "manual").strip(),
             statement_file=(tx.statement_file or "").strip(),
             pdf_row_number=tx.pdf_row_number,
         )
@@ -106,21 +100,19 @@ class ExpenseDB:
             self.conn.execute(
                 """
                 INSERT INTO transactions (
-                    txn_date, txn_date_sort, "transaction", withdrawals, deposits, balance,
-                    other_information, category, source, statement_file, pdf_row_number, row_hash
+                    txn_date, txn_date_sort, "transaction", debit, credit,
+                    category, mode, statement_file, pdf_row_number, row_hash
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     normalized.txn_date,
                     date_sort_key(normalized.txn_date),
                     normalized.transaction,
-                    normalized.withdrawals,
-                    normalized.deposits,
-                    normalized.balance,
-                    normalized.other_information,
+                    normalized.debit,
+                    normalized.credit,
                     normalized.category,
-                    normalized.source,
+                    normalized.mode,
                     normalized.statement_file,
                     normalized.pdf_row_number,
                     row_hash,
@@ -159,9 +151,9 @@ class ExpenseDB:
             clauses.append("category = ?")
             params.append(category)
         if text:
-            clauses.append('("transaction" LIKE ? OR other_information LIKE ?)')
+            clauses.append('"transaction" LIKE ?')
             needle = f"%{text}%"
-            params.extend([needle, needle])
+            params.append(needle)
         if start_date:
             clauses.append("txn_date_sort >= ?")
             params.append(date_sort_key(start_date))
@@ -205,12 +197,10 @@ class ExpenseDB:
                 [
                     "Txn Date",
                     "Transaction",
-                    "Withdrawals",
-                    "Deposits",
-                    "Balance",
-                    "Other Information",
+                    "Debit",
+                    "Credit",
                     "Category",
-                    "Source",
+                    "Mode",
                     "Statement File",
                 ]
             )
@@ -218,13 +208,11 @@ class ExpenseDB:
                 writer.writerow(
                     [
                         row["txn_date"],
-                    row["transaction"],
-                        row["withdrawals"] if row["withdrawals"] is not None else "",
-                        row["deposits"] if row["deposits"] is not None else "",
-                        row["balance"] if row["balance"] is not None else "",
-                        row["other_information"],
+                        row["transaction"],
+                        row["debit"] if row["debit"] is not None else "",
+                        row["credit"] if row["credit"] is not None else "",
                         row["category"],
-                        row["source"],
+                        row["mode"],
                         row["statement_file"],
                     ]
                 )
