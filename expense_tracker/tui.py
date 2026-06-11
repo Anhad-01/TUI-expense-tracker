@@ -9,7 +9,7 @@ from textual.widgets import Button, DataTable, Footer, Header, Input, Static
 from .categorize import categorize
 from .db import ExpenseDB
 from .models import Transaction
-from .pdf_pipeline import extract_transactions_from_pdf
+from .pdf_pipeline import extract_statement_from_pdf
 
 
 class ExpenseTrackerApp(App):
@@ -17,15 +17,59 @@ class ExpenseTrackerApp(App):
     Screen {
         layout: vertical;
     }
+    .top {
+        height: 10;
+    }
+    .panel {
+        border: round $accent;
+        padding: 0 1;
+    }
+    #digital_panel {
+        width: 24%;
+    }
+    #cash_panel {
+        width: 38%;
+    }
+    #filter_panel {
+        width: 38%;
+    }
     .toolbar {
         height: 3;
         padding: 0 1;
     }
+    .buttons {
+        height: 3;
+        padding: 0 1;
+        content-align: center middle;
+    }
+    .sqlbar {
+        height: 3;
+        padding: 0 1;
+    }
+    .bottom {
+        height: 1fr;
+    }
+    #table_panel {
+        width: 65%;
+        border: round $accent;
+        padding: 0 1;
+    }
+    #analysis_panel {
+        width: 35%;
+        border: round $accent;
+        padding: 0 1;
+        overflow-y: auto;
+    }
     Input {
-        width: 1fr;
+        width: auto;
+        min-width: 8;
     }
     Button {
-        width: 14;
+        width: auto;
+        min-width: 10;
+    }
+    #sql_query {
+        width: 1fr;
     }
     #status {
         height: 1;
@@ -33,6 +77,9 @@ class ExpenseTrackerApp(App):
     }
     DataTable {
         height: 1fr;
+    }
+    #analysis {
+        height: auto;
     }
     """
 
@@ -50,29 +97,48 @@ class ExpenseTrackerApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical():
-            with Horizontal(classes="toolbar"):
-                yield Input(placeholder="PDF path", id="pdf_path")
-                yield Input(placeholder="PDF password", password=True, id="pdf_password")
-                yield Button("Import PDF", id="import_pdf")
-                yield Button("Clear DB", id="clear_db")
-            with Horizontal(classes="toolbar"):
-                yield Input(placeholder="Date dd/mm/yyyy", id="manual_date")
-                yield Input(placeholder="Transaction", id="manual_transaction")
-                yield Input(placeholder="Category", id="manual_category")
-                yield Input(placeholder="Debit", id="manual_debit")
-                yield Input(placeholder="Credit", id="manual_credit")
-                yield Button("Add", id="add_manual")
-            with Horizontal(classes="toolbar"):
-                yield Input(placeholder="Filter category", id="filter_category")
-                yield Input(placeholder="From dd/mm/yyyy", id="filter_start")
-                yield Input(placeholder="To dd/mm/yyyy", id="filter_end")
-                yield Input(placeholder="Search text", id="filter_text")
-                yield Button("Filter", id="apply_filter")
-            with Horizontal(classes="toolbar"):
-                yield Input(placeholder='SQL query, e.g. SELECT * FROM transactions WHERE category = "Food"', id="sql_query")
+            with Horizontal(classes="top"):
+                with Vertical(classes="panel", id="digital_panel"):
+                    yield Static("Add digital transactions")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="PDF path", id="pdf_path")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="password", password=True, id="pdf_password")
+                        yield Button("Import PDF", id="import_pdf")
+                with Vertical(classes="panel", id="cash_panel"):
+                    yield Static("Add Cash Transactions")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="Date", id="manual_date")
+                        yield Input(placeholder="Transaction", id="manual_transaction")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="Debit", id="manual_debit")
+                        yield Input(placeholder="Credit", id="manual_credit")
+                        yield Button("Add transaction", id="add_manual")
+                with Vertical(classes="panel", id="filter_panel"):
+                    yield Static("Filter Search")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="Category", id="filter_category")
+                        yield Input(placeholder="From", id="filter_start")
+                        yield Input(placeholder="To", id="filter_end")
+                    with Horizontal(classes="toolbar"):
+                        yield Input(placeholder="Search text", id="filter_text")
+                        yield Input(placeholder="Month yyyy-mm", id="analysis_month")
+                        yield Button("Filter", id="apply_filter")
+            with Horizontal(classes="sqlbar"):
+                yield Input(
+                    placeholder='SQL query, e.g. SELECT * FROM transactions WHERE category = "Food"',
+                    id="sql_query",
+                )
                 yield Button("Run SQL", id="run_sql")
+                yield Button("Clear DB", id="clear_db")
             yield Static("", id="status")
-            yield DataTable(id="transactions")
+            with Horizontal(classes="bottom"):
+                with Vertical(id="table_panel"):
+                    yield Static("Transaction database")
+                    yield DataTable(id="transactions")
+                with Vertical(id="analysis_panel"):
+                    yield Static("Expenditure analysis")
+                    yield Static("", id="analysis")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -81,24 +147,12 @@ class ExpenseTrackerApp(App):
     def set_transaction_columns(self) -> None:
         table = self.query_one("#transactions", DataTable)
         table.clear(columns=True)
-        table.add_columns(
-            "Date",
-            "Transaction",
-            "Debit",
-            "Credit",
-            "Category",
-            "Mode",
-        )
+        table.add_columns("Date", "Transaction", "Debit", "Credit", "Category", "Mode")
 
-    def show_transactions(
-        self,
-        category: str | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        text: str | None = None,
-    ) -> None:
+    def show_transactions(self) -> None:
         self.set_transaction_columns()
         self.refresh_table()
+        self.refresh_analysis()
 
     def refresh_table(self) -> None:
         table = self.query_one("#transactions", DataTable)
@@ -118,6 +172,9 @@ class ExpenseTrackerApp(App):
                 row["mode"],
             )
 
+    def refresh_analysis(self) -> None:
+        self.query_one("#analysis", Static).update(self.build_analysis_text())
+
     def set_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
@@ -130,7 +187,13 @@ class ExpenseTrackerApp(App):
         self.set_status("Refreshed.")
 
     def action_clear_filters(self) -> None:
-        for selector_id in ("filter_category", "filter_start", "filter_end", "filter_text"):
+        for selector_id in (
+            "filter_category",
+            "filter_start",
+            "filter_end",
+            "filter_text",
+            "analysis_month",
+        ):
             self.query_one(f"#{selector_id}", Input).value = ""
         self.show_transactions()
         self.set_status("Filters cleared.")
@@ -158,18 +221,20 @@ class ExpenseTrackerApp(App):
             self.set_status("Enter a PDF path.")
             return
         try:
-            rows = extract_transactions_from_pdf(Path(pdf_path), password=password)
+            rows, balances = extract_statement_from_pdf(Path(pdf_path), password=password)
             inserted, skipped = self.db.insert_many(rows)
+            self.db.insert_closing_balances(balances)
         except Exception as exc:
             self.set_status(f"Import failed: {exc}")
             return
         self.show_transactions()
-        self.set_status(f"Extracted {len(rows)} rows. Inserted {inserted}; skipped {skipped}.")
+        self.set_status(
+            f"Rows {len(rows)}. Inserted {inserted}. Skipped {skipped}. Balances {len(balances)}."
+        )
 
     def add_manual(self) -> None:
         date = self.query_one("#manual_date", Input).value.strip()
         transaction = self.query_one("#manual_transaction", Input).value.strip()
-        manual_category = self.query_one("#manual_category", Input).value.strip()
         debit = self.query_one("#manual_debit", Input).value.strip()
         credit = self.query_one("#manual_credit", Input).value.strip()
         if not date or not transaction:
@@ -182,7 +247,7 @@ class ExpenseTrackerApp(App):
                     transaction=transaction,
                     debit=float(debit) if debit else None,
                     credit=float(credit) if credit else None,
-                    category=manual_category or categorize(transaction),
+                    category=categorize(transaction),
                     mode="manual",
                 )
             )
@@ -217,6 +282,7 @@ class ExpenseTrackerApp(App):
             return
         if columns:
             self.show_sql_results(columns, rows)
+            self.refresh_analysis()
             self.set_status(f"SQL returned {len(rows)} rows.")
         else:
             self.show_transactions()
@@ -228,6 +294,59 @@ class ExpenseTrackerApp(App):
         table.add_columns(*columns)
         for row in rows:
             table.add_row(*["" if row[column] is None else str(row[column]) for column in columns])
+
+    def build_analysis_text(self) -> str:
+        month = self.input_value("analysis_month") or self.default_analysis_month()
+        lines = [
+            "Monthly closing balance",
+            self.render_monthly_closing_balance(),
+            "",
+            "Category wise expenditure overall",
+            self.render_category_spend(None),
+            "",
+            f"Category wise expenditure {month or 'no month'}",
+            self.render_category_spend(month),
+            "",
+            "Costliest transaction",
+            self.render_costliest_transaction(),
+            "",
+            "Percent math: debit total = 100%.",
+        ]
+        return "\n".join(lines)
+
+    def default_analysis_month(self) -> str | None:
+        months = self.db.months_with_transactions()
+        return months[0] if months else None
+
+    def render_monthly_closing_balance(self) -> str:
+        rows = self.db.monthly_closing_balances()
+        if not rows:
+            return "No closing balance data."
+        max_balance = max(row["closing_balance"] for row in rows) or 1
+        return "\n".join(
+            f"{row['month']} {self.bar(row['closing_balance'], max_balance)} {row['closing_balance']:.2f}"
+            for row in rows
+        )
+
+    def render_category_spend(self, month: str | None) -> str:
+        rows = self.db.category_spend(month)
+        if not rows:
+            return "No debit data."
+        total = sum(row["total"] for row in rows) or 1
+        return "\n".join(
+            f"{row['category']} {self.bar(row['total'], total)} {row['total']:.2f} ({row['total'] / total:.1%})"
+            for row in rows
+        )
+
+    def render_costliest_transaction(self) -> str:
+        row = self.db.costliest_transaction()
+        if not row:
+            return "No debit data."
+        return f"{row['txn_date']} | {row['transaction']} | {row['category']} | {row['debit']:.2f}"
+
+    def bar(self, value: float, max_value: float, width: int = 18) -> str:
+        filled = int((value / max_value) * width) if max_value else 0
+        return "[" + "#" * filled + "." * (width - filled) + "]"
 
     def on_unmount(self) -> None:
         self.db.close()

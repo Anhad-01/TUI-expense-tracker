@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from .categorize import categorize
-from .models import Transaction
+from .models import ClosingBalance, Transaction
 
 
 DEFAULT_DB_PATH = Path("expense_tracker.sqlite3")
@@ -81,6 +81,21 @@ class ExpenseDB:
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_transactions_sort ON transactions(txn_date_sort DESC, id DESC)"
         )
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS closing_balances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                month TEXT NOT NULL,
+                closing_balance REAL NOT NULL,
+                statement_file TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(month, statement_file)
+            )
+            """
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_closing_balances_month ON closing_balances(month)"
+        )
         self.conn.commit()
 
     def insert_transaction(self, tx: Transaction) -> bool:
@@ -133,8 +148,32 @@ class ExpenseDB:
                 skipped += 1
         return inserted, skipped
 
+    def insert_closing_balance(self, balance: ClosingBalance) -> bool:
+        try:
+            self.conn.execute(
+                """
+                INSERT INTO closing_balances (month, closing_balance, statement_file)
+                VALUES (?, ?, ?)
+                ON CONFLICT(month, statement_file) DO UPDATE SET
+                    closing_balance = excluded.closing_balance
+                """,
+                (balance.month, balance.closing_balance, balance.statement_file),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def insert_closing_balances(self, balances: list[ClosingBalance]) -> int:
+        saved = 0
+        for balance in balances:
+            if self.insert_closing_balance(balance):
+                saved += 1
+        return saved
+
     def clear_transactions(self) -> int:
         cursor = self.conn.execute("DELETE FROM transactions")
+        self.conn.execute("DELETE FROM closing_balances")
         self.conn.commit()
         return cursor.rowcount
 
@@ -187,6 +226,59 @@ class ExpenseDB:
             return columns, list(cursor.fetchall()), cursor.rowcount
         self.conn.commit()
         return [], [], cursor.rowcount
+
+    def monthly_closing_balances(self) -> list[sqlite3.Row]:
+        return list(
+            self.conn.execute(
+                """
+                SELECT month, closing_balance
+                FROM closing_balances
+                ORDER BY month
+                """
+            )
+        )
+
+    def category_spend(self, month: str | None = None) -> list[sqlite3.Row]:
+        where = "WHERE debit IS NOT NULL AND debit > 0"
+        params: list[object] = []
+        if month:
+            where += " AND substr(txn_date_sort, 1, 7) = ?"
+            params.append(month)
+        return list(
+            self.conn.execute(
+                f"""
+                SELECT category, SUM(debit) AS total
+                FROM transactions
+                {where}
+                GROUP BY category
+                ORDER BY total DESC
+                """,
+                params,
+            )
+        )
+
+    def months_with_transactions(self) -> list[str]:
+        return [
+            row["month"]
+            for row in self.conn.execute(
+                """
+                SELECT DISTINCT substr(txn_date_sort, 1, 7) AS month
+                FROM transactions
+                ORDER BY month DESC
+                """
+            )
+        ]
+
+    def costliest_transaction(self) -> sqlite3.Row | None:
+        return self.conn.execute(
+            """
+            SELECT *
+            FROM transactions
+            WHERE debit IS NOT NULL
+            ORDER BY debit DESC
+            LIMIT 1
+            """
+        ).fetchone()
 
     def export_csv(self, output_path: Path | str) -> Path:
         path = Path(output_path)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .categorize import categorize
 from .db import parse_display_date
-from .models import Transaction
+from .models import ClosingBalance, Transaction
 
 
 DATE_RE = re.compile(r"^\d{2}[-/]\d{2}[-/]\d{4}$")
@@ -51,49 +51,88 @@ def extract_transactions_from_pdf(
     pdf_path: Path | str,
     password: str | None = None,
 ) -> list[Transaction]:
-    pdfplumber = _require_pdfplumber()
-    source = Path(pdf_path)
-    transactions: list[Transaction] = []
-    row_number = 0
-    with pdfplumber.open(source, password=password or "") as pdf:
-        for page in pdf.pages:
-            for table in page.extract_tables() or []:
-                batch, row_number = _transactions_from_table(table, source.name, row_number)
-                transactions.extend(batch)
+    transactions, _ = extract_statement_from_pdf(pdf_path, password=password)
     return transactions
 
 
-def _transactions_from_table(
-    table: list[list[object]], statement_file: str, start_row: int = 0
-) -> tuple[list[Transaction], int]:
-    rows: list[Transaction] = []
-    row_number = start_row
-    for raw_row in table:
-        cells = [normalize_text(cell) for cell in raw_row if cell is not None][:6]
-        if len(cells) < 6:
-            continue
+def extract_statement_from_pdf(
+    pdf_path: Path | str,
+    password: str | None = None,
+) -> tuple[list[Transaction], list[ClosingBalance]]:
+    pdfplumber = _require_pdfplumber()
+    source = Path(pdf_path)
+    scanner = StatementScanner(source.name)
+    with pdfplumber.open(source, password=password or "") as pdf:
+        for page in pdf.pages[1:]:
+            for table in page.extract_tables() or []:
+                scanner.consume_table(table)
+                if scanner.done:
+                    return scanner.transactions, scanner.closing_balances
+    return scanner.transactions, scanner.closing_balances
+
+
+class StatementScanner:
+    def __init__(self, statement_file: str) -> None:
+        self.statement_file = statement_file
+        self.in_statement_table = False
+        self.done = False
+        self.row_number = 0
+        self.last_txn_date: str | None = None
+        self.transactions: list[Transaction] = []
+        self.closing_balances: list[ClosingBalance] = []
+
+    def consume_table(self, table: list[list[object]]) -> None:
+        for raw_row in table:
+            cells = [normalize_text(cell) for cell in raw_row if cell is not None][:6]
+            if len(cells) < 6:
+                continue
+            marker = cells[1].lower()
+            if not self.in_statement_table:
+                if "opening balance" in marker:
+                    self.in_statement_table = True
+                continue
+            if "closing balance" in marker:
+                self.add_closing_balance(cells)
+                self.done = True
+                return
+            transaction = self.row_to_transaction(cells)
+            if transaction:
+                self.transactions.append(transaction)
+
+    def row_to_transaction(self, cells: list[str]) -> Transaction | None:
         txn_date = cells[0]
-        transaction_raw = cells[1]
         if not DATE_RE.match(txn_date):
-            continue
-        transaction = simplify_transaction(transaction_raw)
-        if not transaction or transaction.lower() in {"opening balance", "closing balance"}:
-            continue
-        row_number += 1
-        rows.append(
-            Transaction(
-                txn_date=statement_date_to_display(txn_date),
-                transaction=transaction,
-                debit=parse_amount(cells[2]),
-                credit=parse_amount(cells[3]),
-                category=categorize(transaction),
-                mode="UPI",
-                statement_file=statement_file,
-                pdf_row_number=row_number,
+            return None
+        transaction = simplify_transaction(cells[1])
+        if not transaction:
+            return None
+        self.row_number += 1
+        self.last_txn_date = statement_date_to_display(txn_date)
+        return Transaction(
+            txn_date=self.last_txn_date,
+            transaction=transaction,
+            debit=parse_amount(cells[2]),
+            credit=parse_amount(cells[3]),
+            category=categorize(transaction),
+            mode="UPI",
+            statement_file=self.statement_file,
+            pdf_row_number=self.row_number,
+        )
+
+    def add_closing_balance(self, cells: list[str]) -> None:
+        if not self.last_txn_date:
+            return
+        balance = parse_amount(cells[4])
+        if balance is None:
+            return
+        day, month, year = self.last_txn_date.split("/")
+        self.closing_balances.append(
+            ClosingBalance(
+                month=f"{year}-{month}",
+                closing_balance=balance,
+                statement_file=self.statement_file,
             )
         )
-    return rows, row_number
-
 
 
 

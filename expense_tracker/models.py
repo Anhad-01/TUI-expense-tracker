@@ -13,3 +13,10 @@ class Transaction:
     mode: str = "manual"
     statement_file: str = ""
     pdf_row_number: int = 0
+
+
+@dataclass(frozen=True)
+class ClosingBalance:
+    month: str
+    closing_balance: float
+    statement_file: str = ""

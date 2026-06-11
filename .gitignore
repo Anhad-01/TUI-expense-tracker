@@ -6,3 +6,4 @@ statements/
 statements/.pruned/
 __pycache__/
 *.pyc
+.obsidian/
