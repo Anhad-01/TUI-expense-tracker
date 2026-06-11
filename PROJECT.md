@@ -89,3 +89,5 @@ Each transaction is hashed (SHA-256) on `txn_date|description|debit|credit|mode|
 | `pikepdf` password decryption | ○ (removed — pdfplumber handles passwords natively) |
 
 fix by kilo: updated TUI top panel row layout for digital PDF imports, cash manual entries, and filter search controls.
+feat by kilo: added plotext-based unicode bar graphs for monthly closing balance, overall category spend, and monthly category spend in the analysis panel.
+fix by kilo: simplified analysis graphs to compact unicode horizontal bars and added category spend sections for all months plus overall spend.

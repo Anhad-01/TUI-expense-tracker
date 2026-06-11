@@ -296,7 +296,6 @@ class ExpenseTrackerApp(App):
             table.add_row(*["" if row[column] is None else str(row[column]) for column in columns])
 
     def build_analysis_text(self) -> str:
-        month = self.input_value("analysis_month") or self.default_analysis_month()
         lines = [
             "Monthly closing balance",
             self.render_monthly_closing_balance(),
@@ -304,13 +303,11 @@ class ExpenseTrackerApp(App):
             "Category wise expenditure overall",
             self.render_category_spend(None),
             "",
-            f"Category wise expenditure {month or 'no month'}",
-            self.render_category_spend(month),
+            "Category wise expenditure by month",
+            self.render_category_spend_by_month(),
             "",
             "Costliest transaction",
             self.render_costliest_transaction(),
-            "",
-            "Percent math: debit total = 100%.",
         ]
         return "\n".join(lines)
 
@@ -322,31 +319,67 @@ class ExpenseTrackerApp(App):
         rows = self.db.monthly_closing_balances()
         if not rows:
             return "No closing balance data."
-        max_balance = max(row["closing_balance"] for row in rows) or 1
-        return "\n".join(
-            f"{row['month']} {self.bar(row['closing_balance'], max_balance)} {row['closing_balance']:.2f}"
-            for row in rows
-        )
+        labels = [row["month"] for row in rows]
+        values = [float(row["closing_balance"]) for row in rows]
+        return self.render_value_bars(labels, values, max_abs=True)
 
     def render_category_spend(self, month: str | None) -> str:
         rows = self.db.category_spend(month)
         if not rows:
             return "No debit data."
-        total = sum(row["total"] for row in rows) or 1
-        return "\n".join(
-            f"{row['category']} {self.bar(row['total'], total)} {row['total']:.2f} ({row['total'] / total:.1%})"
+        return self.render_category_rows(rows)
+
+    def render_category_spend_by_month(self) -> str:
+        months = sorted(self.db.months_with_transactions())
+        if not months:
+            return "No transaction months."
+        sections = []
+        for month in months:
+            rows = self.db.category_spend(month)
+            if not rows:
+                continue
+            sections.append(month)
+            sections.append(self.render_category_rows(rows))
+        return "\n\n".join(sections) if sections else "No debit data."
+
+    def render_category_rows(self, rows: list[object]) -> str:
+        labels = [row["category"] for row in rows]
+        values = [float(row["total"]) for row in rows]
+        total = sum(values) or 1
+        bar_lines = self.render_value_bars(labels, values)
+        legend = "\n".join(
+            f"{'':>{16}} {row['total']:.2f} ({row['total'] / total:.1%})"
             for row in rows
         )
+        return "\n".join([bar_lines, legend])
+
+    def render_value_bars(
+        self,
+        labels: list[str],
+        values: list[float],
+        width: int = 24,
+        max_abs: bool = False,
+    ) -> str:
+        if not values:
+            return "No data."
+        scale = max(abs(value) for value in values) if max_abs else max(values)
+        if scale <= 0:
+            return "No data."
+        lines = []
+        for label, value in zip(labels, values):
+            filled = int(round(abs(value) / scale * width))
+            bar = "█" * filled if value >= 0 else "░" * filled
+            lines.append(f"{self.short_label(label):<16} {bar} {value:.2f}")
+        return "\n".join(lines)
+
+    def short_label(self, label: str, max_length: int = 16) -> str:
+        return label if len(label) <= max_length else f"{label[: max_length - 1]}…"
 
     def render_costliest_transaction(self) -> str:
         row = self.db.costliest_transaction()
         if not row:
             return "No debit data."
         return f"{row['txn_date']} | {row['transaction']} | {row['category']} | {row['debit']:.2f}"
-
-    def bar(self, value: float, max_value: float, width: int = 18) -> str:
-        filled = int((value / max_value) * width) if max_value else 0
-        return "[" + "#" * filled + "." * (width - filled) + "]"
 
     def on_unmount(self) -> None:
         self.db.close()
