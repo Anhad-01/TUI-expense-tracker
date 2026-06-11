@@ -50,12 +50,12 @@ class ExpenseTrackerApp(App):
         height: 1fr;
     }
     #table_panel {
-        width: 65%;
+        width: 58%;
         border: round $accent;
         padding: 0 1;
     }
     #analysis_panel {
-        width: 35%;
+        width: 42%;
         border: round $accent;
         padding: 0 1;
         overflow-y: auto;
@@ -89,6 +89,7 @@ class ExpenseTrackerApp(App):
         ("c", "clear_filters", "Clear Filters"),
         ("q", "quit", "Quit"),
     ]
+    MAX_TRANSACTION_DISPLAY_LENGTH = 25
 
     def __init__(self, db_path: str) -> None:
         super().__init__()
@@ -122,7 +123,6 @@ class ExpenseTrackerApp(App):
                         yield Input(placeholder="To", id="filter_end")
                     with Horizontal(classes="toolbar"):
                         yield Input(placeholder="Search text", id="filter_text")
-                        yield Input(placeholder="Month yyyy-mm", id="analysis_month")
                         yield Button("Filter", id="apply_filter")
             with Horizontal(classes="sqlbar"):
                 yield Input(
@@ -165,7 +165,7 @@ class ExpenseTrackerApp(App):
         ):
             table.add_row(
                 row["txn_date"],
-                row["transaction"],
+                self.display_value(row["transaction"], self.MAX_TRANSACTION_DISPLAY_LENGTH),
                 "" if row["debit"] is None else f"{row['debit']:.2f}",
                 "" if row["credit"] is None else f"{row['credit']:.2f}",
                 row["category"],
@@ -192,7 +192,6 @@ class ExpenseTrackerApp(App):
             "filter_start",
             "filter_end",
             "filter_text",
-            "analysis_month",
         ):
             self.query_one(f"#{selector_id}", Input).value = ""
         self.show_transactions()
@@ -293,7 +292,25 @@ class ExpenseTrackerApp(App):
         table.clear(columns=True)
         table.add_columns(*columns)
         for row in rows:
-            table.add_row(*["" if row[column] is None else str(row[column]) for column in columns])
+            table.add_row(
+                *[
+                    self.display_value(
+                        row[column],
+                        self.MAX_TRANSACTION_DISPLAY_LENGTH
+                        if str(column).lower() == "transaction"
+                        else None,
+                    )
+                    for column in columns
+                ]
+            )
+
+    def display_value(self, value: object, max_length: int | None = None) -> str:
+        if value is None:
+            return ""
+        text = str(value)
+        if max_length is not None and len(text) > max_length:
+            return f"{text[: max_length - 1]}…"
+        return text
 
     def build_analysis_text(self) -> str:
         lines = [
@@ -311,10 +328,6 @@ class ExpenseTrackerApp(App):
         ]
         return "\n".join(lines)
 
-    def default_analysis_month(self) -> str | None:
-        months = self.db.months_with_transactions()
-        return months[0] if months else None
-
     def render_monthly_closing_balance(self) -> str:
         rows = self.db.monthly_closing_balances()
         if not rows:
@@ -330,7 +343,7 @@ class ExpenseTrackerApp(App):
         return self.render_category_rows(rows)
 
     def render_category_spend_by_month(self) -> str:
-        months = sorted(self.db.months_with_transactions())
+        months = self.db.months_with_transactions()
         if not months:
             return "No transaction months."
         sections = []
