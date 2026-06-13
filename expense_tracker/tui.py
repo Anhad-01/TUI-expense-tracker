@@ -323,8 +323,8 @@ class ExpenseTrackerApp(App):
             "Category wise expenditure by month",
             self.render_category_spend_by_month(),
             "",
-            "Costliest transaction",
-            self.render_costliest_transaction(),
+            "Costliest expenditure by month",
+            self.render_costliest_expenditure_by_month(),
         ]
         return "\n".join(lines)
 
@@ -388,11 +388,19 @@ class ExpenseTrackerApp(App):
     def short_label(self, label: str, max_length: int = 16) -> str:
         return label if len(label) <= max_length else f"{label[: max_length - 1]}…"
 
-    def render_costliest_transaction(self) -> str:
-        row = self.db.costliest_transaction()
-        if not row:
-            return "No debit data."
-        return f"{row['txn_date']} | {row['transaction']} | {row['category']} | {row['debit']:.2f}"
+    def render_costliest_expenditure_by_month(self) -> str:
+        months = self.db.months_with_transactions()
+        if not months:
+            return "No transaction months."
+        sections = []
+        for month in months:
+            row = self.db.costliest_transaction(month)
+            if not row:
+                continue
+            sections.append(
+                f"{month}\n{row['txn_date']} | {self.display_value(row['transaction'], self.MAX_TRANSACTION_DISPLAY_LENGTH)} | {row['category']} | {row['debit']:.2f}"
+            )
+        return "\n\n".join(sections) if sections else "No debit data."
 
     def on_unmount(self) -> None:
         self.db.close()

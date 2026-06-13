@@ -269,15 +269,21 @@ class ExpenseDB:
             )
         ]
 
-    def costliest_transaction(self) -> sqlite3.Row | None:
+    def costliest_transaction(self, month: str | None = None) -> sqlite3.Row | None:
+        where = "WHERE debit IS NOT NULL"
+        params: list[object] = []
+        if month:
+            where += " AND substr(txn_date_sort, 1, 7) = ?"
+            params.append(month)
         return self.conn.execute(
-            """
+            f"""
             SELECT *
             FROM transactions
-            WHERE debit IS NOT NULL
+            {where}
             ORDER BY debit DESC
             LIMIT 1
-            """
+            """,
+            params,
         ).fetchone()
 
     def export_csv(self, output_path: Path | str) -> Path:
