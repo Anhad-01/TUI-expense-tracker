@@ -106,7 +106,7 @@ class ExpenseDB:
             debit=amount_to_db(tx.debit),
             credit=amount_to_db(tx.credit),
             category=(tx.category or categorize(tx.transaction)).strip(),
-            mode=(tx.mode or "manual").strip(),
+            mode=(tx.mode or "cash").strip(),
             statement_file=(tx.statement_file or "").strip(),
             pdf_row_number=tx.pdf_row_number,
         )

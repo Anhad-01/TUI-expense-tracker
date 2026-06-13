@@ -10,7 +10,7 @@ class Transaction:
     debit: float | None = None
     credit: float | None = None
     category: str = "Uncategorized"
-    mode: str = "manual"
+    mode: str = "cash"
     statement_file: str = ""
     pdf_row_number: int = 0
 

@@ -52,7 +52,7 @@ def run(argv: list[str] | None = None) -> int:
                         debit=args.debit,
                         credit=args.credit,
                         category=category,
-                        mode="manual",
+                        mode="cash",
                     )
                 )
                 print("Inserted manual transaction." if inserted else "Skipped duplicate transaction.")

@@ -247,7 +247,7 @@ class ExpenseTrackerApp(App):
                     debit=float(debit) if debit else None,
                     credit=float(credit) if credit else None,
                     category=categorize(transaction),
-                    mode="manual",
+                    mode="cash",
                 )
             )
         except Exception as exc:

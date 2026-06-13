@@ -93,3 +93,4 @@ Each transaction is hashed (SHA-256) on `txn_date|description|debit|credit|mode|
 - fix by kilo: simplified analysis graphs to compact unicode horizontal bars and added category spend sections for all months plus overall spend.
 - fix by kilo: removed unused analysis month input/function, ordered monthly expenditure newest first, and limited transaction column display to 25 characters.
 - fix by kilo: renamed costliest transaction to costliest expenditure and rendered it per month instead of overall.
+- fix by opencode: changed `mode` value for manual cash entries from `"manual"` to `"cash"` across models, db, TUI, and CLI.
